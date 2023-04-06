@@ -1,0 +1,19 @@
+{
+  "name": "p2psimulate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^24.0.0"
+  },
+  "dependencies": {
+    "echarts": "^5.4.2",
+    "jquery": "^3.6.4"
+  }
+}
