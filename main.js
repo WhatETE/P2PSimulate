@@ -7,9 +7,11 @@ const createWindow = () => {
     height: 1080,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: true,
     },
   })
-  ipcMain.handle('ping', () => 'pong')
-  win.loadFile('index.html')
+  win.webContents.openDevTools()
+  win.loadFile('./index.html')
+  win.webContents.send('api',_,SortedArraySet,Heap)
 }
 app.whenReady().then(createWindow)

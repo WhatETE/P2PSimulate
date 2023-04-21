@@ -10,10 +10,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@electron/rebuild": "^3.2.12",
     "electron": "^24.0.0"
   },
   "dependencies": {
+    "collections": "^5.1.13",
     "echarts": "^5.4.2",
-    "jquery": "^3.6.4"
+    "jquery": "^3.6.4",
+    "underscore": "^1.13.6"
   }
 }

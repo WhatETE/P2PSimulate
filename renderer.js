@@ -1,72 +1,111 @@
-function draw() {
-
-    var graph = data2Graph([[0, 1, 10], [1, 0, 1], [1, 2, 5], [2, 0, 5]]);
-
-    drawGraph(graph);
-
-}
-
-function data2Graph(data) {
-    var graph = {}
-    var vertices = {}
-    var links = [];
-    for (var i = 0; i < data.length; i++) {
-        var s = String(data[i][0]);
-        var t = String(data[i][1]);
-        var v = data[i][2];
-        vertices[s] = s;
-        vertices[t] = t;
-        links.push({ 'source': s, 'target': t, 'value': v });
+var chartDom = document.getElementById('main');
+var myChart = echarts.init(chartDom, null, {
+    width: 1600,
+    height: 900
+});
+window.p2p.initial()
+window.p2p.run()
+window.p2p.print()
+var option;
+var data = [
+    {
+        name: 'Node 1',
+        x: 300,
+        y: 300
+    },
+    {
+        name: 'Node 2',
+        x: 800,
+        y: 300
+    },
+    {
+        name: 'Node 3',
+        x: 550,
+        y: 100
+    },
+    {
+        name: 'Node 4',
+        x: 550,
+        y: 500
     }
-    var nodes = [];
-    $.each(vertices, function (k, v) {
-        nodes.push({ 'name': v, 'value': v });
-    });
-    graph['links'] = links;
-    graph['data'] = nodes;
-    return graph;
-}
+];
+var links = [
+    {
+        source: 0,
+        target: 1,
+        symbolSize: [5, 20],
+        label: {
+            show: true
+        },
+        lineStyle: {
+            width: 5,
+            curveness: 0.2
+        }
+    },
+    {
+        source: 'Node 2',
+        target: 'Node 1',
+        label: {
+            show: true
+        },
+        lineStyle: {
+            curveness: 0.2
+        }
+    },
+    {
+        source: 'Node 1',
+        target: 'Node 3'
+    },
+    {
+        source: 'Node 2',
+        target: 'Node 3'
+    },
+    {
+        source: 'Node 2',
+        target: 'Node 4'
+    },
+    {
+        source: 'Node 1',
+        target: 'Node 4'
+    }
+];
 
-function drawGraph(graph) {
-    var myChart = echarts.init(document.getElementById('main'), null, {
-        width: 1920,
-        height: 1080
-    });
-    var option = {
-        tooltip: {},
-        series: [
-            {
-                type: 'graph',
-                layout: 'force',
-                symbolSize: 30,
-                edgeSymbol: ['none', 'arrow'],
-                data: graph.data,
-                links: graph.links,
-                roam: true,
-                label: {
-                    normal: {
-                        show: true,
-                        formatter: function (e) {
-                            return e['data']['value'];
-                        }
-                    }
-                },
-                edgeLabel: {
-                    normal: {
-                        show: true,
-                        position: 'middle'
-                    }
-                },
-                force: {
-                    repulsion: 1000,
-                    edgeLength: 200
-                }
+option = {
+    title: {
+        text: 'Basic Graph'
+    },
+    tooltip: {},
+    animationDurationUpdate: 1500,
+    animationEasingUpdate: 'quinticInOut',
+    series: [
+        {
+            type: 'graph',
+            layout: 'none',
+            symbolSize: 50,
+            roam: true,
+            label: {
+                show: true
+            },
+            edgeSymbol: ['circle', 'arrow'],
+            edgeSymbolSize: [4, 10],
+            edgeLabel: {
+                fontSize: 20
+            },
+            data: data,
+            links: links,
+            lineStyle: {
+                opacity: 0.9,
+                width: 2,
+                curveness: 0
             }
-        ]
-    };
+        }
+    ]
+};
+
+option && myChart.setOption(option);
+
+var button=document.getElementById("but");
+button.onclick=function(){
+    data[0].name="new node";
     myChart.setOption(option);
 }
-
-$(function () {
-    draw();
-});
