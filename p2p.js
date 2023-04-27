@@ -15,8 +15,6 @@ var ConnectMatrix = null
 var SendEventQueue = null
 var CurrentTime = 0
 
-exports = {DeviceList, ConnectMatrix, SendEventQueue, CurrentTime}
-
 //事件类
 class Event {
     constructor(time) {
@@ -163,7 +161,7 @@ class Server extends Client {
     }
 }
 
-function inital(){
+function initial(){
     //全局设备列表
     DeviceList = new Array(ClientNum + 1)
     //连接设备矩阵
@@ -181,22 +179,34 @@ function inital(){
         new Client(i).RandomConnect()
     for (let i = 1; i < ClientNum + 1; i++)
         DeviceList[i].SpeedCompute()
+    module.exports.DeviceList = DeviceList
+    module.exports.ConnectMatrix = ConnectMatrix
 }
 
 function run(){
     //运行框架
-    while (CurrentTime<100) {
+    while (true) {
         new GenerateEvent(CurrentTime).run()
         while (SendEventQueue.length > 0 && SendEventQueue.peek().time <= CurrentTime)
             SendEventQueue.pop().run()
         new PlayEvent(CurrentTime).run()
         new RequestEvent(CurrentTime).run()
-        console.log(CurrentTime)
         CurrentTime += 1
+        module.exports.DeviceList = DeviceList
+        module.exports.ConnectMatrix = ConnectMatrix
+        module.exports.CurrentTime = CurrentTime
     }
 }
 
 function print(){
     for (let i = 1; i < DeviceList.length; i++)
         console.log('播放比：' + String(DeviceList[i].PlayTime / CurrentTime) + ' 丢包数' + String(DeviceList[i].LostBlocks))
+    
 }
+
+module.exports.initial = initial
+module.exports.run = run
+module.exports.print = print
+module.exports.DeviceList = DeviceList
+module.exports.ConnectMatrix = ConnectMatrix
+module.exports.CurrentTime = CurrentTime
