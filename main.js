@@ -7,8 +7,8 @@ const Heap = require("collections/heap")
 //配置
 const ClientNum = 100
 const ConnectNum = 5
-const Minimum_PlayNum = 30
-const CacheSize = 30
+const MinimumPlayNum = 30
+const CacheSize = 60
 const RoomSize = 1000
 const Rate = 20000
 
@@ -62,15 +62,17 @@ class PlayEvent extends Event {
   }
   run() {
     for (let i = 1; i < DeviceList.length; i++) {
+      //缓存为空则跳过
       if (DeviceList[i].CachedBlocks.length == 0)
         continue
+      //进度落后则已缺失数据块
       if (DeviceList[i].CachedBlocks[0] > DeviceList[i].Progress) {
         DeviceList[i].LostBlocks += DeviceList[i].CachedBlocks[0] - DeviceList[i].Progress
         DeviceList[i].Progress = DeviceList[i].CachedBlocks[0]
       }
       let Consecutive = true
       let Index = DeviceList[i].CachedBlocks.indexOf(DeviceList[i].Progress)
-      if (Index + Minimum_PlayNum <= DeviceList[i].CachedBlocks.length) {
+      if (Index + 2 * MinimumPlayNum <= DeviceList[i].CachedBlocks.length) {
         let t = DeviceList[i].CachedBlocks.slice(Index).toArray()
         for (let j = 1; j < t.length; j++) {
           if (t[j] != t[j - 1] + 1) {
@@ -79,8 +81,11 @@ class PlayEvent extends Event {
           }
         }
         if (Consecutive) {
+          if (DeviceList[i].Delay == -1)
+            DeviceList[i].Delay == 0
+          DeviceList[i].Delay = (DeviceList[i].Delay * DeviceList[i].PlayTime + (CurrentTime - DeviceList[i].Progress / 30) + (DeviceList[i].Progress % 30 / 30)) / (DeviceList[i].PlayTime + 1)
           DeviceList[i].PlayTime += 1
-          DeviceList[i].Progress += Minimum_PlayNum
+          DeviceList[i].Progress += MinimumPlayNum
         }
       }
     }
@@ -113,6 +118,7 @@ class Client {
     this.PlayTime = 0
     this.Progress = 0
     this.LostBlocks = 0
+    this.Delay = -1
   }
   //随机连接设备
   RandomConnect() {
@@ -166,11 +172,6 @@ function check() {
 
 }
 
-function get_rate_and_delay(id) {
-  let rate = ((DeviceList[i].PlayTime / CurrentTime).toFixed(2)).toString()
-  let delay = 
-}
-
 function print(type) {
   if (CurrentTime == 0 || type == 1) {
     let data = []
@@ -197,7 +198,7 @@ function print(type) {
   else {
     let tooltips = []
     for (let i = 0; i < DeviceList.length; i++) {
-      tooltips.push(((DeviceList[i].PlayTime / CurrentTime).toFixed(2)).toString())
+      tooltips.push((DeviceList[i].PlayTime / CurrentTime).toFixed(2).toString() + ',' + DeviceList[i].Delay.toFixed(2).toString())
     }
     mainWindow.webContents.send('print_tags', tooltips)
   }
