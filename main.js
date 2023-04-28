@@ -15,6 +15,7 @@ const Rate = 20000
 var DeviceList = null
 var ConnectMatrix = null
 var SendEventQueue = null
+var ExitEventQueue = null
 var CurrentTime = 0
 
 var mainWindow = null
@@ -38,6 +39,8 @@ class SendEvent extends Event {
     this.data = data
   }
   run() {
+    if (DeviceList[this.target] == null)
+        return
     if (DeviceList[this.target].CachedBlocks.length == CacheSize) {
       DeviceList[this.target].CachedBlocks.shift()
     }
@@ -62,32 +65,8 @@ class PlayEvent extends Event {
   }
   run() {
     for (let i = 1; i < DeviceList.length; i++) {
-      //缓存为空则跳过
-      if (DeviceList[i].CachedBlocks.length == 0)
-        continue
-      //进度落后则已缺失数据块
-      if (DeviceList[i].CachedBlocks[0] > DeviceList[i].Progress) {
-        DeviceList[i].LostBlocks += DeviceList[i].CachedBlocks[0] - DeviceList[i].Progress
-        DeviceList[i].Progress = DeviceList[i].CachedBlocks[0]
-      }
-      let Consecutive = true
-      let Index = DeviceList[i].CachedBlocks.indexOf(DeviceList[i].Progress)
-      if (Index + 2 * MinimumPlayNum <= DeviceList[i].CachedBlocks.length) {
-        let t = DeviceList[i].CachedBlocks.slice(Index).toArray()
-        for (let j = 1; j < t.length; j++) {
-          if (t[j] != t[j - 1] + 1) {
-            Consecutive = false
-            break
-          }
-        }
-        if (Consecutive) {
-          if (DeviceList[i].Delay == -1)
-            DeviceList[i].Delay == 0
-          DeviceList[i].Delay = (DeviceList[i].Delay * DeviceList[i].PlayTime + (CurrentTime - DeviceList[i].Progress / 30) + (DeviceList[i].Progress % 30 / 30)) / (DeviceList[i].PlayTime + 1)
-          DeviceList[i].PlayTime += 1
-          DeviceList[i].Progress += MinimumPlayNum
-        }
-      }
+      if (DeviceList[i] != null)
+        DeviceList[i].Play()
     }
   }
 }
@@ -99,8 +78,20 @@ class RequestEvent extends Event {
   }
   run() {
     for (let i = 1; i < DeviceList.length; i++) {
-      DeviceList[i].Request()
+      if (DeviceList[i] != null)
+        DeviceList[i].Request()
     }
+  }
+}
+
+class ExitEvent extends Event {
+  constructor(time, ID) {
+    super(time)
+    this.ID = ID
+  }
+  run() {
+    if (DeviceList[this.ID] != null)
+      DeviceList[this.ID].Exit()
   }
 }
 
@@ -152,6 +143,43 @@ class Client {
       })
     }
   }
+  //播放视频
+  Play() {
+    //缓存为空则跳过
+    if (this.CachedBlocks.length == 0)
+      return
+    //进度落后则已缺失数据块
+    if (this.CachedBlocks[0] > this.Progress) {
+      this.LostBlocks += this.CachedBlocks[0] - this.Progress
+      this.Progress = this.CachedBlocks[0]
+    }
+    let Consecutive = true
+    let Index = this.CachedBlocks.indexOf(this.Progress)
+    if (Index + 2 * MinimumPlayNum <= this.CachedBlocks.length) {
+      let t = this.CachedBlocks.slice(Index).toArray()
+      for (let j = 1; j < t.length; j++) {
+        if (t[j] != t[j - 1] + 1) {
+          Consecutive = false
+          break
+        }
+      }
+      if (Consecutive) {
+        if (this.Delay == -1)
+        this.Delay == 0
+        this.Delay = (this.Delay * this.PlayTime + (CurrentTime - this.Progress / 30) + (this.Progress % 30 / 30)) / (this.PlayTime + 1)
+        this.PlayTime += 1
+        this.Progress += MinimumPlayNum
+      }
+    }
+  }
+  Exit() {
+    for (let i = 0; i < ConnectMatrix.length; i++) {
+      if (ConnectMatrix[i].has(this.ID))
+        ConnectMatrix[i].delete(this.ID)
+    }
+    ConnectMatrix[this.ID] = []
+    DeviceList[this.ID] = null
+  }
 }
 
 //服务器类
@@ -168,15 +196,13 @@ class Server extends Client {
   }
 }
 
-function check() {
-
-}
-
 function print(type) {
   if (CurrentTime == 0 || type == 1) {
     let data = []
     let links = []
     for (let i = 0; i < DeviceList.length; i++) {
+      if (DeviceList[i] == null)
+        continue
       data.push({
         name: String(i),
         x: DeviceList[i].pos[0],
@@ -198,6 +224,8 @@ function print(type) {
   else {
     let tooltips = []
     for (let i = 0; i < DeviceList.length; i++) {
+      if (DeviceList[i] == null)
+        continue
       tooltips.push((DeviceList[i].PlayTime / CurrentTime).toFixed(2).toString() + ',' + DeviceList[i].Delay.toFixed(2).toString())
     }
     mainWindow.webContents.send('print_tags', tooltips)
@@ -214,6 +242,7 @@ function initial() {
   }
   //发送事件队列，用最小堆实现
   SendEventQueue = Heap([], null, function (a, b) { return b - a })
+  ExitEventQueue = []
   //全局时间
   CurrentTime = 0
   //创建服务器，客户机并连接
@@ -222,18 +251,19 @@ function initial() {
     new Client(i).RandomConnect()
   for (let i = 1; i < ClientNum + 1; i++)
     DeviceList[i].SpeedCompute()
-  module.exports.DeviceList = DeviceList
-  module.exports.ConnectMatrix = ConnectMatrix
 }
 
 function run() {
   //运行框架
+  let JudgeFull = ExitEventQueue.length > 0 ? 1 : 0
   new GenerateEvent(CurrentTime).run()
+  while (ExitEventQueue.length > 0)
+    ExitEventQueue.shift().run()
   while (SendEventQueue.length > 0 && SendEventQueue.peek().time <= CurrentTime)
     SendEventQueue.pop().run()
   new PlayEvent(CurrentTime).run()
   new RequestEvent(CurrentTime).run()
-  print(0)
+  print(JudgeFull)
   CurrentTime += 1
 }
 
@@ -250,6 +280,10 @@ const createWindow = () => {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('clientExit', function (event, clients) {
+    for (let i = 0; i < clients.length; i++)
+      ExitEventQueue.push(new ExitEvent(CurrentTime, clients[i]))
+  })
   ipcMain.handle('continue', run)
   createWindow()
 })

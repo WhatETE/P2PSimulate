@@ -6,6 +6,7 @@ var myChart = echarts.init(chartDom, null, {
 var option
 var data = []
 var links = []
+var exitCommand = []
 
 option = {
     title: {
@@ -36,6 +37,12 @@ option = {
 }
 
 var button = document.getElementById("but")
+button.onclick = function () {
+    t = parseInt(Math.random() * data.length)
+    while (t == 0 || t == 1)
+        t = parseInt(Math.random() * data.length)
+    exitCommand.push(t)
+}
 
 electronAPI.on_print_full((event, value) => {
     data = value[0]
@@ -52,5 +59,9 @@ electronAPI.on_print_tags((event, value) => {
     }
     option.series[0].data = data
     myChart.setOption(option)
+    if (exitCommand.length > 0) {
+        electronAPI.clientExit(exitCommand)
+        exitCommand = []
+    }
     electronAPI.continue()
 })
