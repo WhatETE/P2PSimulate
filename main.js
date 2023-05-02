@@ -14,9 +14,9 @@ const Rate = 20000
 
 var DeviceList = null
 var ConnectMatrix = null
-var SendEventQueue = null
-var ExitEventQueue = null
+var EventQueue = null
 var CurrentTime = 0
+var JudgeModified = false
 
 var mainWindow = null
 
@@ -91,7 +91,21 @@ class ExitEvent extends Event {
   }
   run() {
     if (DeviceList[this.ID] != null)
+      JudgeModified = true
       DeviceList[this.ID].Exit()
+  }
+}
+
+class DisconnectEvent extends Event {
+  constructor(time, sourceID, targetID) {
+    super(time)
+    this.sourceID = sourceID
+    this.targetID = targetID
+  }
+  run() {
+    if (DeviceList[this.targetID] != null)
+      JudgeModified = true
+      DeviceList[this.targetID].Disconnect(this.sourceID)
   }
 }
 
@@ -137,7 +151,7 @@ class Client {
       let RequestedCount = 0
       DeviceList[i].CachedBlocks.forEach(j => {
         if (this.CachedBlocks.length == 0 || ((!this.CachedBlocks.has(j)) && (j > this.CachedBlocks.min()))) {
-          SendEventQueue.push(new SendEvent(CurrentTime + 1 + parseInt(RequestedCount / this.ConnectSpeed[i]), this.ID, j))
+          EventQueue.push(new SendEvent(CurrentTime + 1 + parseInt(RequestedCount / this.ConnectSpeed[i]), this.ID, j))
           RequestedCount += 1
         }
       })
@@ -174,11 +188,13 @@ class Client {
   }
   Exit() {
     for (let i = 0; i < ConnectMatrix.length; i++) {
-      if (ConnectMatrix[i].has(this.ID))
-        ConnectMatrix[i].delete(this.ID)
+      ConnectMatrix[i].delete(this.ID)
     }
     ConnectMatrix[this.ID] = []
     DeviceList[this.ID] = null
+  }
+  Disconnect(ID) {
+    ConnectMatrix[this.ID].delete(ID)
   }
 }
 
@@ -197,9 +213,11 @@ class Server extends Client {
 }
 
 function print(type) {
-  if (CurrentTime == 0 || type == 1) {
+  if (CurrentTime == 0 || JudgeModified) {
     let data = []
     let links = []
+    let rateSource = [['name', 'Rate']]
+    let delaySource = [['name', 'Delay']]
     for (let i = 0; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
@@ -209,9 +227,13 @@ function print(type) {
         y: DeviceList[i].pos[1],
         tooltip: {
           position: 'top',
-          formatter: ((DeviceList[i].PlayTime / CurrentTime).toFixed(2)).toString()
+          formatter: (DeviceList[i].PlayTime / CurrentTime).toFixed(2).toString() + ',' + DeviceList[i].Delay.toFixed(2).toString()
         }
       })
+      if (i > 0){
+        rateSource.push([String(i), (DeviceList[i].PlayTime / CurrentTime).toFixed(2)])
+        delaySource.push([String(i), DeviceList[i].Delay.toFixed(2)])
+      }
       for (let j = 0; j < ConnectMatrix[i].length; j++) {
         links.push({
           source: String(ConnectMatrix[i][j]),
@@ -219,17 +241,18 @@ function print(type) {
         })
       }
     }
-    mainWindow.webContents.send('print_full', [data, links])
+    mainWindow.webContents.send('print_full', [data, links, rateSource, delaySource])
   }
   else {
     let tooltips = []
     for (let i = 0; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
-      tooltips.push((DeviceList[i].PlayTime / CurrentTime).toFixed(2).toString() + ',' + DeviceList[i].Delay.toFixed(2).toString())
+      tooltips.push([(DeviceList[i].PlayTime / CurrentTime).toFixed(2), DeviceList[i].Delay.toFixed(2)])
     }
     mainWindow.webContents.send('print_tags', tooltips)
   }
+  JudgeModified = false
 }
 
 function initial() {
@@ -241,8 +264,7 @@ function initial() {
     ConnectMatrix[i] = []
   }
   //发送事件队列，用最小堆实现
-  SendEventQueue = Heap([], null, function (a, b) { return b - a })
-  ExitEventQueue = []
+  EventQueue = Heap([], null, function (a, b) { return b - a })
   //全局时间
   CurrentTime = 0
   //创建服务器，客户机并连接
@@ -255,15 +277,12 @@ function initial() {
 
 function run() {
   //运行框架
-  let JudgeFull = ExitEventQueue.length > 0 ? 1 : 0
   new GenerateEvent(CurrentTime).run()
-  while (ExitEventQueue.length > 0)
-    ExitEventQueue.shift().run()
-  while (SendEventQueue.length > 0 && SendEventQueue.peek().time <= CurrentTime)
-    SendEventQueue.pop().run()
+  while (EventQueue.length > 0 && EventQueue.peek().time <= CurrentTime)
+    EventQueue.pop().run()
   new PlayEvent(CurrentTime).run()
   new RequestEvent(CurrentTime).run()
-  print(JudgeFull)
+  print()
   CurrentTime += 1
 }
 
@@ -282,7 +301,11 @@ const createWindow = () => {
 app.whenReady().then(() => {
   ipcMain.handle('clientExit', function (event, clients) {
     for (let i = 0; i < clients.length; i++)
-      ExitEventQueue.push(new ExitEvent(CurrentTime, clients[i]))
+      EventQueue.push(new ExitEvent(CurrentTime, clients[i]))
+  })
+  ipcMain.handle('clientDisconnect', function (event, connections) {
+    for (let i = 0; i < connections.length; i++)
+      EventQueue.push(new DisconnectEvent(CurrentTime, connections[i][0], connections[i][1]))
   })
   ipcMain.handle('continue', run)
   createWindow()
