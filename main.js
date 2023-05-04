@@ -3,7 +3,7 @@ const path = require('path')
 const _ = require('underscore')
 const SortedArraySet = require("collections/sorted-array-set")
 const Heap = require("collections/heap")
-
+const DistanceMatrix = require('./DistanceMatrix.js')
 //配置
 var ClientNum = 100
 var ConnectNum = 5
@@ -17,54 +17,13 @@ var RandomNetwork = true
 
 var DeviceList = null
 var ConnectMatrix = null
-var DistanceMatrix = null
+var Distance = null
 var EventQueue = null
 var CurrentTime = 0
 var JudgeModified = false
 
 var mainWindow = null
 
-class HalfMatrix {
-  constructor(size) {
-    this.size = size
-    this.data = new Array(size)
-    for (let i = 0; i < size; i++) {
-      this.data[i] = new Array(size - i - 1)
-    }
-  }
-  get(i ,j) {
-    if (i == j)
-      return null
-    else if (i < j)
-      return this.data[i][j]
-    else
-      return this.data[j][i]
-  }
-  set(i, j, value) {
-    if (i == j)
-      return
-    if (i < j)
-      this.data[i][j] = value
-    else
-      this.data[j][i] = value
-  }
-  block(i) {
-    for( let j = 0; j < this.size; j++) {
-      this.set(i, j, null)
-    }
-  }
-  findclosest(i) {
-    let min = Infinity
-    let minj = -1
-    for (let j = 0; j < this.size; j++) {
-      if (this.get(i, j) != null && this.get(i, j) < min) {
-        min = this.get(i, j)
-        minj = j
-      }
-    }
-    return minj
-  }
-}
 //事件类
 class Event {
   constructor(time) {
@@ -85,7 +44,7 @@ class SendEvent extends Event {
   }
   run() {
     if (DeviceList[this.target] == null)
-        return
+      return
     //保证缓存区大小
     if (DeviceList[this.target].CachedBlocks.length == CacheSize) {
       DeviceList[this.target].CachedBlocks.shift()
@@ -138,7 +97,7 @@ class ExitEvent extends Event {
   }
   run() {
     if (DeviceList[this.ID] == null)
-        return
+      return
     JudgeModified = true
     DeviceList[this.ID].Exit()
   }
@@ -153,7 +112,7 @@ class DisconnectEvent extends Event {
   }
   run() {
     if (DeviceList[this.targetID] == null)
-        return
+      return
     JudgeModified = true
     DeviceList[this.targetID].Disconnect(this.sourceID)
   }
@@ -189,7 +148,7 @@ class Client {
   //计算连接速度，存储于字典
   SpeedCompute() {
     for (let i of ConnectMatrix[this.ID]) {
-      let speed = parseInt(SpeedRate / DistanceMatrix.get(this.ID,i))
+      let speed = parseInt(SpeedRate / Distance.get(this.ID, i))
       speed = Math.max(speed, 20)
       speed = Math.min(speed, 100)
       this.ConnectSpeed[i] = speed
@@ -236,7 +195,7 @@ class Client {
   }
   //节点退出
   Exit() {
-    DistanceMatrix.block(this.ID)
+    Distance.block(this.ID)
     ConnectMatrix[this.ID] = null
     DeviceList[this.ID] = null
     for (let i = 0; i < ConnectMatrix.length; i++) {
@@ -251,9 +210,9 @@ class Client {
     ConnectMatrix[this.ID].delete(ID)
     delete this.ConnectSpeed[ID]
     if (ExitStrategy) {
-      let t = DistanceMatrix.findclosest(this.ID)
+      let t = Distance.findclosest(this.ID)
       ConnectMatrix[this.ID].push(t)
-      let speed = parseInt(SpeedRate / DistanceMatrix.get(this.ID,t))
+      let speed = parseInt(SpeedRate / Distance.get(this.ID, t))
       speed = Math.max(speed, 20)
       speed = Math.min(speed, 100)
       this.ConnectSpeed[t] = speed
@@ -294,7 +253,7 @@ function print() {
           formatter: (DeviceList[i].PlayTime / CurrentTime).toFixed(2).toString() + ',' + DeviceList[i].Delay.toFixed(2).toString()
         }
       })
-      if (i > 0){
+      if (i > 0) {
         rateSource.push([String(i), (DeviceList[i].PlayTime / CurrentTime).toFixed(2)])
         delaySource.push([String(i), DeviceList[i].Delay.toFixed(2)])
       }
@@ -337,10 +296,10 @@ function initial() {
   new Server().RandomConnect()
   for (let i = 1; i < ClientNum + 1; i++)
     new Client(i).RandomConnect()
-  DistanceMatrix = new HalfMatrix(ClientNum + 1)
+  Distance = new DistanceMatrix(ClientNum + 1)
   for (let i = 0; i < ClientNum + 1; i++) {
     for (let j = i + 1; j < ClientNum + 1; j++) {
-      DistanceMatrix.set(i,j,Math.sqrt(Math.pow(DeviceList[i].pos[0] - DeviceList[j].pos[0], 2) + Math.pow(DeviceList[i].pos[1] - DeviceList[j].pos[1], 2)))
+      Distance.set(i, j, DeviceList[i].pos, DeviceList[j].pos)
     }
   }
   for (let i = 1; i < ClientNum + 1; i++)

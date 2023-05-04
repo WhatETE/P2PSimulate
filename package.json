@@ -17,6 +17,7 @@
     "collections": "^5.1.13",
     "echarts": "^5.4.2",
     "jquery": "^3.6.4",
-    "underscore": "^1.13.6"
+    "underscore": "^1.13.6",
+    "weighted-random": "^0.1.0"
   }
 }
