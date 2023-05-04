@@ -12,7 +12,35 @@
 </head>
 
 <body>
-  <button type="button" id="but" >button</button>
+  <div>
+    客户端数量：
+    <input type="number" class="setter" id="ClientNum" placeholder="ClientNum" value="100" />
+  </div>
+  <div>
+    客户端的最大连接数量：
+    <input type="number" class="setter" id="ConnectNum" placeholder="ConnectNum" value="5" />
+  </div>
+  <div>
+    播放数据包的最小连续数据包数量：
+    <input type="number" class="setter" id="MinimumPlayNum" placeholder="MinimumPlayNum" value="30" />
+  </div>
+  <div>
+    客户端最大缓存数量：
+    <input type="number" class="setter" id="CacheSize" placeholder="CacheSize" value="60" />
+  </div>
+  <div>
+    空间大小（a X a）：
+    <input type="number" class="setter" id="RoomSize" placeholder="RoomSize" value="1000" />
+  </div>
+  <div>
+    反比例系数：
+    <input type="number" class="setter" id="SpeedRate" placeholder="SpeedRate" value="20000" />
+  </div>
+  <div>
+        <input type="checkbox" class="setter" id="ExitStrategy" checked="checked" /> 退出策略
+        <input type="checkbox" class="setter" id="RandomNetwork" checked="checked" /> 随机网络
+  </div>
+  <button type="button" id="but" >重启</button>
   <div id="graph"></div>
   <div id="rate"></div>
   <div id="delay"></div>

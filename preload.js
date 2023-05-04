@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   on_print_tags: (callback) => ipcRenderer.on('print_tags', callback),
   continue: () => ipcRenderer.invoke('continue'),
   clientExit: ( clients ) => ipcRenderer.invoke('clientExit', clients),
-  clientDisconnect: ( connections ) => ipcRenderer.invoke('clientDisconnect', connections)
+  clientDisconnect: ( connections ) => ipcRenderer.invoke('clientDisconnect', connections),
+  restart: ( args ) => ipcRenderer.invoke('restart', args),
 })

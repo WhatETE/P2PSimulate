@@ -5,21 +5,66 @@ const SortedArraySet = require("collections/sorted-array-set")
 const Heap = require("collections/heap")
 
 //配置
-const ClientNum = 100
-const ConnectNum = 5
-const MinimumPlayNum = 30
-const CacheSize = 60
-const RoomSize = 1000
-const Rate = 20000
+var ClientNum = 100
+var ConnectNum = 5
+var MinimumPlayNum = 30
+var CacheSize = 60
+var RoomSize = 1000
+var SpeedRate = 20000
+
+var ExitStrategy = true
+var RandomNetwork = true
 
 var DeviceList = null
 var ConnectMatrix = null
+var DistanceMatrix = null
 var EventQueue = null
 var CurrentTime = 0
 var JudgeModified = false
 
 var mainWindow = null
 
+class HalfMatrix {
+  constructor(size) {
+    this.size = size
+    this.data = new Array(size)
+    for (let i = 0; i < size; i++) {
+      this.data[i] = new Array(size - i - 1)
+    }
+  }
+  get(i ,j) {
+    if (i == j)
+      return null
+    else if (i < j)
+      return this.data[i][j]
+    else
+      return this.data[j][i]
+  }
+  set(i, j, value) {
+    if (i == j)
+      return
+    if (i < j)
+      this.data[i][j] = value
+    else
+      this.data[j][i] = value
+  }
+  block(i) {
+    for( let j = 0; j < this.size; j++) {
+      this.set(i, j, null)
+    }
+  }
+  findclosest(i) {
+    let min = Infinity
+    let minj = -1
+    for (let j = 0; j < this.size; j++) {
+      if (this.get(i, j) != null && this.get(i, j) < min) {
+        min = this.get(i, j)
+        minj = j
+      }
+    }
+    return minj
+  }
+}
 //事件类
 class Event {
   constructor(time) {
@@ -41,6 +86,7 @@ class SendEvent extends Event {
   run() {
     if (DeviceList[this.target] == null)
         return
+    //保证缓存区大小
     if (DeviceList[this.target].CachedBlocks.length == CacheSize) {
       DeviceList[this.target].CachedBlocks.shift()
     }
@@ -84,18 +130,21 @@ class RequestEvent extends Event {
   }
 }
 
+//退出事件类
 class ExitEvent extends Event {
   constructor(time, ID) {
     super(time)
     this.ID = ID
   }
   run() {
-    if (DeviceList[this.ID] != null)
-      JudgeModified = true
-      DeviceList[this.ID].Exit()
+    if (DeviceList[this.ID] == null)
+        return
+    JudgeModified = true
+    DeviceList[this.ID].Exit()
   }
 }
 
+//断开连接事件类
 class DisconnectEvent extends Event {
   constructor(time, sourceID, targetID) {
     super(time)
@@ -103,9 +152,10 @@ class DisconnectEvent extends Event {
     this.targetID = targetID
   }
   run() {
-    if (DeviceList[this.targetID] != null)
-      JudgeModified = true
-      DeviceList[this.targetID].Disconnect(this.sourceID)
+    if (DeviceList[this.targetID] == null)
+        return
+    JudgeModified = true
+    DeviceList[this.targetID].Disconnect(this.sourceID)
   }
 }
 
@@ -123,7 +173,7 @@ class Client {
     this.PlayTime = 0
     this.Progress = 0
     this.LostBlocks = 0
-    this.Delay = -1
+    this.Delay = 0
   }
   //随机连接设备
   RandomConnect() {
@@ -136,10 +186,10 @@ class Client {
     }
     ConnectMatrix[this.ID] = _.sample(t, ConnectNum)
   }
-
+  //计算连接速度，存储于字典
   SpeedCompute() {
     for (let i of ConnectMatrix[this.ID]) {
-      let speed = parseInt(Rate / Math.sqrt((this.pos[0] - DeviceList[i].pos[0]) ** 2 + (this.pos[1] - DeviceList[i].pos[1]) ** 2))
+      let speed = parseInt(SpeedRate / DistanceMatrix.get(this.ID,i))
       speed = Math.max(speed, 20)
       speed = Math.min(speed, 100)
       this.ConnectSpeed[i] = speed
@@ -178,23 +228,36 @@ class Client {
         }
       }
       if (Consecutive) {
-        if (this.Delay == -1)
-        this.Delay == 0
         this.Delay = (this.Delay * this.PlayTime + (CurrentTime - this.Progress / 30) + (this.Progress % 30 / 30)) / (this.PlayTime + 1)
         this.PlayTime += 1
         this.Progress += MinimumPlayNum
       }
     }
   }
+  //节点退出
   Exit() {
-    for (let i = 0; i < ConnectMatrix.length; i++) {
-      ConnectMatrix[i].delete(this.ID)
-    }
-    ConnectMatrix[this.ID] = []
+    DistanceMatrix.block(this.ID)
+    ConnectMatrix[this.ID] = null
     DeviceList[this.ID] = null
+    for (let i = 0; i < ConnectMatrix.length; i++) {
+      if (ConnectMatrix[i] == null)
+        continue
+      else if (ConnectMatrix[i].has(this.ID))
+        DeviceList[i].Disconnect(this.ID)
+    }
   }
+  //断开特定连接
   Disconnect(ID) {
     ConnectMatrix[this.ID].delete(ID)
+    delete this.ConnectSpeed[ID]
+    if (ExitStrategy) {
+      let t = DistanceMatrix.findclosest(this.ID)
+      ConnectMatrix[this.ID].push(t)
+      let speed = parseInt(SpeedRate / DistanceMatrix.get(this.ID,t))
+      speed = Math.max(speed, 20)
+      speed = Math.min(speed, 100)
+      this.ConnectSpeed[t] = speed
+    }
   }
 }
 
@@ -212,7 +275,8 @@ class Server extends Client {
   }
 }
 
-function print(type) {
+function print() {
+  //节点或连接改变时全局更新
   if (CurrentTime == 0 || JudgeModified) {
     let data = []
     let links = []
@@ -243,6 +307,7 @@ function print(type) {
     }
     mainWindow.webContents.send('print_full', [data, links, rateSource, delaySource])
   }
+  //节点或连接未改变时只更新进度
   else {
     let tooltips = []
     for (let i = 0; i < DeviceList.length; i++) {
@@ -267,10 +332,17 @@ function initial() {
   EventQueue = Heap([], null, function (a, b) { return b - a })
   //全局时间
   CurrentTime = 0
+  JudgeModified = false
   //创建服务器，客户机并连接
   new Server().RandomConnect()
   for (let i = 1; i < ClientNum + 1; i++)
     new Client(i).RandomConnect()
+  DistanceMatrix = new HalfMatrix(ClientNum + 1)
+  for (let i = 0; i < ClientNum + 1; i++) {
+    for (let j = i + 1; j < ClientNum + 1; j++) {
+      DistanceMatrix.set(i,j,Math.sqrt(Math.pow(DeviceList[i].pos[0] - DeviceList[j].pos[0], 2) + Math.pow(DeviceList[i].pos[1] - DeviceList[j].pos[1], 2)))
+    }
+  }
   for (let i = 1; i < ClientNum + 1; i++)
     DeviceList[i].SpeedCompute()
 }
@@ -299,15 +371,30 @@ const createWindow = () => {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('continue', run)
+  //处理节点退出
   ipcMain.handle('clientExit', function (event, clients) {
     for (let i = 0; i < clients.length; i++)
       EventQueue.push(new ExitEvent(CurrentTime, clients[i]))
   })
+  //处理断开连接
   ipcMain.handle('clientDisconnect', function (event, connections) {
     for (let i = 0; i < connections.length; i++)
       EventQueue.push(new DisconnectEvent(CurrentTime, connections[i][0], connections[i][1]))
   })
-  ipcMain.handle('continue', run)
+  //处理重启
+  ipcMain.handle('restart', function (event, args) {
+    ClientNum = parseInt(args[0])
+    ConnectNum = parseInt(args[1])
+    MinimumPlayNum = parseInt(args[2])
+    CacheSize = parseInt(args[3])
+    RoomSize = parseInt(args[4])
+    SpeedRate = parseFloat(args[5])
+    ExitStrategy = args[6]
+    RandomNetwork = args[7]
+    initial()
+    setTimeout(run, 1000)
+  })
   createWindow()
 })
 

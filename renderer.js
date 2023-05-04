@@ -1,3 +1,22 @@
+var setter = $('.setter').toArray()
+var button = document.getElementById("but")
+
+button.onclick = function () {
+    let args = []
+    for (let i = 0; i < 6; i++) {
+        args.push(setter[i].value)
+    }
+    for (let i = 6; i < 8; i++) {
+        args.push(setter[i].checked ? true : false)
+    }
+    electronAPI.restart(args)
+}
+
+for (let i = 0; i < 5; i++) {
+    setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
+}
+setter[5].oninput = () => {setter[5].value = setter[5].value.replace(/[^\0-9\.]/g,'')}
+
 var graphDom = document.getElementById('graph')
 var myGraph = echarts.init(graphDom, null, {
     width: 1600,
@@ -31,7 +50,7 @@ var option = {
         {
             type: 'graph',
             layout: 'none',
-            symbolSize: 10,
+            symbolSize: 15,
             roam: true,
             edgeSymbol: ['circle', 'arrow'],
             edgeSymbolSize: [4, 8],
@@ -44,6 +63,9 @@ var option = {
                 opacity: 1,
                 width: 0.7,
                 curveness: 0
+            },
+            label:{
+                show: true
             }
         }
     ]
@@ -105,14 +127,6 @@ myDelay.on('dblclick', function (params) {
         exitCommand.push(parseInt(params.data[0]))
     }
 })
-
-var button = document.getElementById("but")
-button.onclick = function () {
-    t = parseInt(Math.random() * data.length)
-    while (t == 0 || t == 1)
-        t = parseInt(Math.random() * data.length)
-    exitCommand.push(t)
-}
 
 electronAPI.on_print_full((event, value) => {
     data = value[0]
