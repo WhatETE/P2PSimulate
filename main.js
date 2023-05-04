@@ -4,6 +4,7 @@ const _ = require('underscore')
 const SortedArraySet = require("collections/sorted-array-set")
 const Heap = require("collections/heap")
 const DistanceMatrix = require('./DistanceMatrix.js')
+const { kmeanspp } = require('./kmeans++.js')
 //配置
 var ClientNum = 100
 var ConnectNum = 5
@@ -11,6 +12,8 @@ var MinimumPlayNum = 30
 var CacheSize = 60
 var RoomSize = 1000
 var SpeedRate = 20000
+var ClusterNum = 10
+var IterNum = 10
 
 var ExitStrategy = true
 var RandomNetwork = true
@@ -21,6 +24,7 @@ var Distance = null
 var EventQueue = null
 var CurrentTime = 0
 var JudgeModified = false
+var Clusters = null
 
 var mainWindow = null
 
@@ -210,13 +214,15 @@ class Client {
     ConnectMatrix[this.ID].delete(ID)
     delete this.ConnectSpeed[ID]
     if (ExitStrategy) {
-      let t = Distance.findclosest(this.ID)
-      ConnectMatrix[this.ID].push(t)
-      let speed = parseInt(SpeedRate / Distance.get(this.ID, t))
-      speed = Math.max(speed, 20)
-      speed = Math.min(speed, 100)
-      this.ConnectSpeed[t] = speed
+      this.Connect(Distance.findclosest(this.ID))
     }
+  }
+  Connect(ID) {
+    ConnectMatrix[this.ID].push(ID)
+    let speed = parseInt(SpeedRate / Distance.get(this.ID, ID))
+    speed = Math.max(speed, 20)
+    speed = Math.min(speed, 100)
+    this.ConnectSpeed[ID] = speed
   }
 }
 
@@ -241,6 +247,8 @@ function print() {
     let links = []
     let rateSource = [['name', 'Rate']]
     let delaySource = [['name', 'Delay']]
+    let rateAverage = 0
+    let delayAverage = 0
     for (let i = 0; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
@@ -256,6 +264,8 @@ function print() {
       if (i > 0) {
         rateSource.push([String(i), (DeviceList[i].PlayTime / CurrentTime).toFixed(2)])
         delaySource.push([String(i), DeviceList[i].Delay.toFixed(2)])
+        rateAverage += (DeviceList[i].PlayTime / CurrentTime)
+        delayAverage += DeviceList[i].Delay
       }
       for (let j = 0; j < ConnectMatrix[i].length; j++) {
         links.push({
@@ -264,16 +274,27 @@ function print() {
         })
       }
     }
+    rateAverage /= rateSource.length - 1
+    delayAverage /= delaySource.length - 1
+    rateSource.push(['平均', rateAverage.toFixed(2)])
+    delaySource.push(['平均', delayAverage.toFixed(2)])
     mainWindow.webContents.send('print_full', [data, links, rateSource, delaySource])
   }
   //节点或连接未改变时只更新进度
   else {
     let tooltips = []
+    let rateAverage = 0
+    let delayAverage = 0
     for (let i = 0; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
       tooltips.push([(DeviceList[i].PlayTime / CurrentTime).toFixed(2), DeviceList[i].Delay.toFixed(2)])
+      rateAverage += (DeviceList[i].PlayTime / CurrentTime)
+      delayAverage += DeviceList[i].Delay
     }
+    rateAverage /= tooltips.length
+    delayAverage /= tooltips.length
+    tooltips.push([rateAverage.toFixed(2), delayAverage.toFixed(2)])
     mainWindow.webContents.send('print_tags', tooltips)
   }
   JudgeModified = false
@@ -292,14 +313,40 @@ function initial() {
   //全局时间
   CurrentTime = 0
   JudgeModified = false
-  //创建服务器，客户机并连接
-  new Server().RandomConnect()
+  new Server()
   for (let i = 1; i < ClientNum + 1; i++)
-    new Client(i).RandomConnect()
+    new Client(i)
+  //计算距离矩阵
   Distance = new DistanceMatrix(ClientNum + 1)
   for (let i = 0; i < ClientNum + 1; i++) {
     for (let j = i + 1; j < ClientNum + 1; j++) {
       Distance.set(i, j, DeviceList[i].pos, DeviceList[j].pos)
+    }
+  }
+  if (RandomNetwork){
+    for (let i = 1; i < ClientNum + 1; i++)
+      DeviceList[i].RandomConnect()
+  }
+  else{
+    let arr = []
+    for (let i = 1; i < ClientNum + 1; i++)
+      arr.push(i)
+    Clusters = kmeanspp(arr, Distance, ClusterNum, IterNum)
+    for (let i = 0; i < ClusterNum; i++){
+      let minDistance = Infinity
+      let minID = -1
+      for (let j = 0; j < Clusters[i].length; j++){
+        let distance = Distance.get(0, Clusters[i][j])
+        if (distance < minDistance){
+          minDistance = distance
+          minID = Clusters[i][j]
+        }
+      }
+      DeviceList[minID].Connect(0)
+      for (let j = 0; j < Clusters[i].length; j++){
+        if (Clusters[i][j] != minID)
+          DeviceList[Clusters[i][j]].Connect(minID)
+      }
     }
   }
   for (let i = 1; i < ClientNum + 1; i++)

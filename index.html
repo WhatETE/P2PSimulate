@@ -37,10 +37,15 @@
     <input type="number" class="setter" id="SpeedRate" placeholder="SpeedRate" value="20000" />
   </div>
   <div>
-        <input type="checkbox" class="setter" id="ExitStrategy" checked="checked" /> 退出策略
-        <input type="checkbox" class="setter" id="RandomNetwork" checked="checked" /> 随机网络
+    <input type="checkbox" class="setter" id="ExitStrategy" checked="checked" /> 退出策略
+    <input type="checkbox" class="setter" id="RandomNetwork" checked="checked" /> 随机网络
+    <select size="1">
+      <option value="0" selected="selected">随机网络</option>
+      <option value="1">基于Kmeans++的</option>
+      <option value="2">无标度网络</option>
+    </select>
   </div>
-  <button type="button" id="but" >重启</button>
+  <button type="button" id="but">重启</button>
   <div id="graph"></div>
   <div id="rate"></div>
   <div id="delay"></div>

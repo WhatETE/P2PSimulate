@@ -104,7 +104,17 @@ var delayOption = {
     },
     xAxis: { type: 'value' },
     yAxis: { type: 'category' },
-    series: [{ type: 'bar' }]
+    series: [{ 
+        type: 'bar',
+        markline: {
+            data: [
+                {
+                    name: '平均',
+                    type: 'average'
+                }
+            ]
+        }
+    }]
 }
 
 myGraph.on('dblclick', function (params) {
@@ -145,7 +155,8 @@ electronAPI.on_print_full((event, value) => {
 
 electronAPI.on_print_tags((event, tooltips) => {
     for (let i = 0; i < tooltips.length; i++) {
-        data[i].tooltip.formatter = tooltips[i][0].toString() + ',' + tooltips[i][1].toString()
+        if (i < tooltips.length - 1)
+            data[i].tooltip.formatter = tooltips[i][0].toString() + ',' + tooltips[i][1].toString()
         if (i == 0)
             continue
         rateSource[i][1] = tooltips[i][0]

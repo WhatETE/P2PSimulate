@@ -29,11 +29,15 @@ class DistanceMatrix {
       return this.locations[i]
     }
     calculate(i, pos) {
-      return Math.sqrt(Math.pow(locations[i][0] - pos[0], 2) + Math.pow(locations[i][1] - pos[1], 2))
+      return Math.sqrt(Math.pow(this.locations[i][0] - pos[0], 2) + Math.pow(this.locations[i][1] - pos[1], 2))
     }
     block(i) {
+      this.locations[i] = null
       for (let j = 0; j < this.size; j++) {
-        this.set(i, j, null)
+        if (i < j)
+          this.data[i][j] = null
+        else
+          this.data[j][i] = null
       }
     }
     findclosest(i) {
