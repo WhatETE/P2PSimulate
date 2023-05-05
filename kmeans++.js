@@ -28,7 +28,7 @@ function getCentroids(data, distanceMatrix, k) {
     return centroids
 }
 
-function kmeanspp(data, distanceMatrix, k, times) {
+function KMeanspp(data, distanceMatrix, k, times) {
     let centroidpos = getCentroids(data, distanceMatrix, k).map((centroid) => distanceMatrix.locate(centroid))
     let clusters = null
     for (let i = 0; i < times; i++){
@@ -64,5 +64,5 @@ function kmeanspp(data, distanceMatrix, k, times) {
 }
 
 module.exports = {
-    kmeanspp: kmeanspp
+    KMeanspp: KMeanspp
 }

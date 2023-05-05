@@ -1,37 +1,47 @@
 var setter = $('.setter').toArray()
 var button = document.getElementById("but")
+var subdiv = document.getElementById("subdiv")
 
 button.onclick = function () {
     let args = []
     for (let i = 0; i < 6; i++) {
         args.push(setter[i].value)
     }
-    for (let i = 6; i < 8; i++) {
-        args.push(setter[i].checked ? true : false)
-    }
+    args.push(setter[6].checked ? true : false)
+    args.push(setter[7].checked ? true : false)
+    args.push(setter[8].options[setter[8].selectedIndex].value)
+    args.push(setter[9].value)
+    args.push(setter[10].value)
     electronAPI.restart(args)
 }
 
 for (let i = 0; i < 5; i++) {
     setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
 }
-setter[5].oninput = () => {setter[5].value = setter[5].value.replace(/[^\0-9\.]/g,'')}
+setter[5].oninput = () => { setter[5].value = setter[5].value.replace(/[^\0-9\.]/g, '') }
+setter[8].onchange = () => {
+    if (setter[8].selectedIndex == 1) {
+        subdiv.style.display = "block"
+        subdiv.children[1].style.display = "block"
+    }
+    else if (setter[8].selectedIndex == 2) {
+        subdiv.style.display = "block"
+        subdiv.children[1].style.display = "none"
+    }
+    else {
+        subdiv.style.display = "none"
+    }
+}
+for (let i = 9; i < 11; i++) {
+    setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
+}
 
 var graphDom = document.getElementById('graph')
-var myGraph = echarts.init(graphDom, null, {
-    width: 1600,
-    height: 900
-})
+var myGraph = echarts.init(graphDom, null, {})
 var rateDom = document.getElementById('rate')
-var myRate = echarts.init(rateDom, null, {
-    width: 1600,
-    height: 900
-})
+var myRate = echarts.init(rateDom, null, {})
 var delayDom = document.getElementById('delay')
-var myDelay = echarts.init(delayDom, null, {
-    width: 1600,
-    height: 900
-})
+var myDelay = echarts.init(delayDom, null, {})
 
 var data = []
 var links = []
@@ -147,6 +157,10 @@ electronAPI.on_print_full((event, value) => {
     option.series[0].links = links
     rateOption.dataset.source = rateSource
     delayOption.dataset.source = delaySource
+    rateDom.style.height = (1000 * data.length / 100).toString() + 'px'
+    delayDom.style.height = (1000 * data.length / 100).toString() + 'px'
+    myRate.resize()
+    myDelay.resize()
     myGraph.setOption(option)
     myRate.setOption(rateOption)
     myDelay.setOption(delayOption)

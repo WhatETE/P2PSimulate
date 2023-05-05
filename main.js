@@ -3,8 +3,9 @@ const path = require('path')
 const _ = require('underscore')
 const SortedArraySet = require("collections/sorted-array-set")
 const Heap = require("collections/heap")
-const DistanceMatrix = require('./DistanceMatrix.js')
-const { kmeanspp } = require('./kmeans++.js')
+const { DistanceMatrix } = require('./DistanceMatrix.js')
+const { KMeanspp } = require('./KMeans++.js')
+const { AgglomerativeClustering } = require('./Agglomerative.js')
 //配置
 var ClientNum = 100
 var ConnectNum = 5
@@ -12,11 +13,13 @@ var MinimumPlayNum = 30
 var CacheSize = 60
 var RoomSize = 1000
 var SpeedRate = 20000
+
 var ClusterNum = 10
 var IterNum = 10
 
 var ExitStrategy = true
-var RandomNetwork = true
+var Fixed = false
+var NetworkType = 0
 
 var DeviceList = null
 var ConnectMatrix = null
@@ -140,12 +143,11 @@ class Client {
   }
   //随机连接设备
   RandomConnect() {
-    let t = new Array(ClientNum)
-    let j = 0
-    for (let i = 0; i < ClientNum; i++) {
-      if (j == this.ID)
-        j++
-      t[i] = j++
+    let t = new Array()
+    for (let i = 0; i < DeviceList.length; i++) {
+      if (DeviceList[i] == null || i == this.ID)
+        continue
+      t.push(i)
     }
     ConnectMatrix[this.ID] = _.sample(t, ConnectNum)
   }
@@ -199,7 +201,7 @@ class Client {
   }
   //节点退出
   Exit() {
-    Distance.block(this.ID)
+    Distance.del(this.ID)
     ConnectMatrix[this.ID] = null
     DeviceList[this.ID] = null
     for (let i = 0; i < ConnectMatrix.length; i++) {
@@ -214,7 +216,7 @@ class Client {
     ConnectMatrix[this.ID].delete(ID)
     delete this.ConnectSpeed[ID]
     if (ExitStrategy) {
-      this.Connect(Distance.findclosest(this.ID))
+      this.Connect(Distance.FindClosestTo(this.ID))
     }
   }
   Connect(ID) {
@@ -223,6 +225,14 @@ class Client {
     speed = Math.max(speed, 20)
     speed = Math.min(speed, 100)
     this.ConnectSpeed[ID] = speed
+  }
+  clear() {
+    this.ConnectSpeed = {}
+    this.CachedBlocks = SortedArraySet()
+    this.PlayTime = 0
+    this.Progress = 0
+    this.LostBlocks = 0
+    this.Delay = 0
   }
 }
 
@@ -301,56 +311,83 @@ function print() {
 }
 
 function initial() {
-  //全局设备列表
-  DeviceList = new Array(ClientNum + 1)
-  //连接设备矩阵
-  ConnectMatrix = new Array(ClientNum + 1)
-  for (let i = 0; i < ClientNum + 1; i++) {
-    ConnectMatrix[i] = []
-  }
-  //发送事件队列，用最小堆实现
-  EventQueue = Heap([], null, function (a, b) { return b - a })
   //全局时间
   CurrentTime = 0
   JudgeModified = false
-  new Server()
-  for (let i = 1; i < ClientNum + 1; i++)
-    new Client(i)
-  //计算距离矩阵
-  Distance = new DistanceMatrix(ClientNum + 1)
-  for (let i = 0; i < ClientNum + 1; i++) {
-    for (let j = i + 1; j < ClientNum + 1; j++) {
-      Distance.set(i, j, DeviceList[i].pos, DeviceList[j].pos)
+  if (Fixed) {
+    for (let i = 0; i < DeviceList.length; i++){
+      if (DeviceList[i] == null)
+        continue
+      DeviceList[i].clear()
+      ConnectMatrix[i].clear()
+    }
+    EventQueue.clear()
+  }
+  else {
+    //全局设备列表
+    DeviceList = new Array(ClientNum + 1)
+    //连接矩阵
+    ConnectMatrix = new Array(ClientNum + 1)
+    for (let i = 0; i < ClientNum + 1; i++) {
+      ConnectMatrix[i] = []
+    }
+    //发送事件队列，用最小堆实现
+    EventQueue = Heap([], null, function (a, b) { return b - a })
+    new Server()
+    for (let i = 1; i < ClientNum + 1; i++)
+      new Client(i)
+    //计算距离矩阵
+    Distance = new DistanceMatrix(ClientNum + 1)
+    for (let i = 0; i < ClientNum + 1; i++) {
+      for (let j = i + 1; j < ClientNum + 1; j++) {
+        Distance.set(i, j, DeviceList[i].pos, DeviceList[j].pos)
+      }
     }
   }
-  if (RandomNetwork){
-    for (let i = 1; i < ClientNum + 1; i++)
+  //初始化连接
+  if (NetworkType == 0) {
+    for (let i = 1; i < DeviceList.length; i++) {
+      if (DeviceList[i] == null)
+        continue
       DeviceList[i].RandomConnect()
+    }
   }
-  else{
+  else {
     let arr = []
-    for (let i = 1; i < ClientNum + 1; i++)
-      arr.push(i)
-    Clusters = kmeanspp(arr, Distance, ClusterNum, IterNum)
-    for (let i = 0; i < ClusterNum; i++){
+      for (let i = 1; i < DeviceList.length; i++) {
+        if (DeviceList[i] == null)
+          continue
+        arr.push(i)
+    }
+    if (NetworkType == 1) {
+      Clusters = KMeanspp(arr, Distance, ClusterNum, IterNum)
+    }
+    else if (NetworkType == 2) {
+      Clusters = AgglomerativeClustering(arr, Distance, ClusterNum)
+    }
+    for (let i = 0; i < ClusterNum; i++) {
       let minDistance = Infinity
       let minID = -1
-      for (let j = 0; j < Clusters[i].length; j++){
+      for (let j = 0; j < Clusters[i].length; j++) {
         let distance = Distance.get(0, Clusters[i][j])
-        if (distance < minDistance){
+        if (distance < minDistance) {
           minDistance = distance
           minID = Clusters[i][j]
         }
       }
       DeviceList[minID].Connect(0)
-      for (let j = 0; j < Clusters[i].length; j++){
+      for (let j = 0; j < Clusters[i].length; j++) {
         if (Clusters[i][j] != minID)
           DeviceList[Clusters[i][j]].Connect(minID)
       }
     }
   }
-  for (let i = 1; i < ClientNum + 1; i++)
+  //计算连接速度
+  for (let i = 1; i < DeviceList.length; i++) {
+    if (DeviceList[i] == null)
+      continue
     DeviceList[i].SpeedCompute()
+  }
 }
 
 function run() {
@@ -397,7 +434,10 @@ app.whenReady().then(() => {
     RoomSize = parseInt(args[4])
     SpeedRate = parseFloat(args[5])
     ExitStrategy = args[6]
-    RandomNetwork = args[7]
+    Fixed = args[7]
+    NetworkType = args[8]
+    ClusterNum = parseInt(args[9])
+    IterNum = parseInt(args[10])
     initial()
     setTimeout(run, 1000)
   })
