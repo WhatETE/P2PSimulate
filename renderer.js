@@ -45,8 +45,9 @@ var myDelay = echarts.init(delayDom, null, {})
 
 var data = []
 var links = []
-var rateSource = []
-var delaySource = []
+var rateData = []
+var delayData = []
+var Clients = []
 var exitCommand = []
 var disconnectCommand = []
 
@@ -91,12 +92,9 @@ var rateOption = {
     },
     animationDurationUpdate: 0.5,
     legend: {},
-    dataset: {
-        source: rateSource,
-    },
     xAxis: { type: 'value' },
-    yAxis: { type: 'category' },
-    series: [{ type: 'bar' }]
+    yAxis: { type: 'category', data: Clients },
+    series: [{ type: 'bar', data: rateData}]
 }
 
 var delayOption = {
@@ -109,22 +107,9 @@ var delayOption = {
     },
     animationDurationUpdate: 0.5,
     legend: {},
-    dataset: {
-        source: delaySource,
-    },
     xAxis: { type: 'value' },
-    yAxis: { type: 'category' },
-    series: [{ 
-        type: 'bar',
-        markline: {
-            data: [
-                {
-                    name: '平均',
-                    type: 'average'
-                }
-            ]
-        }
-    }]
+    yAxis: { type: 'category', data: Clients },
+    series: [{ type: 'bar', data: delayData}]
 }
 
 myGraph.on('dblclick', function (params) {
@@ -150,13 +135,19 @@ myDelay.on('dblclick', function (params) {
 
 electronAPI.on_print_full((event, value) => {
     data = value[0]
+    data[0].itemStyle = { color: '#FF0000' }
     links = value[1]
-    rateSource = value[2]
-    delaySource = value[3]
+    rateData = value[2]
+    rateData[rateData.length - 1] = { value: rateData[rateData.length - 1], itemStyle: { color: '#FF0000' } }
+    delayData = value[3]
+    delayData[delayData.length - 1] = { value: delayData[delayData.length - 1], itemStyle: { color: '#FF0000' } }
+    Clients = value[4]
     option.series[0].data = data
     option.series[0].links = links
-    rateOption.dataset.source = rateSource
-    delayOption.dataset.source = delaySource
+    rateOption.series[0].data = rateData
+    rateOption.yAxis.data = Clients
+    delayOption.series[0].data = delayData
+    delayOption.yAxis.data = Clients
     rateDom.style.height = (1000 * data.length / 100).toString() + 'px'
     delayDom.style.height = (1000 * data.length / 100).toString() + 'px'
     myRate.resize()
@@ -169,16 +160,19 @@ electronAPI.on_print_full((event, value) => {
 
 electronAPI.on_print_tags((event, tooltips) => {
     for (let i = 0; i < tooltips.length; i++) {
-        if (i < tooltips.length - 1)
+        if (i < tooltips.length - 1) {
             data[i].tooltip.formatter = tooltips[i][0].toString() + ',' + tooltips[i][1].toString()
-        if (i == 0)
-            continue
-        rateSource[i][1] = tooltips[i][0]
-        delaySource[i][1] = tooltips[i][1]
+            rateData[i] = tooltips[i][0]
+            delayData[i] = tooltips[i][1]
+        }
+        else {
+            rateData[i].value = tooltips[i][0]
+            delayData[i].value = tooltips[i][1]
+        }
     }
     option.series[0].data = data
-    rateOption.dataset.source = rateSource
-    delayOption.dataset.source = delaySource
+    rateOption.series[0].data = rateData
+    delayOption.series[0].data = delayData
     myGraph.setOption(option)
     myRate.setOption(rateOption)
     myDelay.setOption(delayOption)

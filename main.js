@@ -263,10 +263,11 @@ function print() {
   if (CurrentTime == 0 || JudgeModified) {
     let data = []
     let links = []
-    let rateSource = [['name', 'Rate']]
-    let delaySource = [['name', 'Delay']]
+    let rateData = []
+    let delayData = []
     let rateAverage = 0
     let delayAverage = 0
+    let Clients = []
     for (let i = 0; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
@@ -280,8 +281,9 @@ function print() {
         }
       })
       if (i > 0) {
-        rateSource.push([String(i), (DeviceList[i].PlayTime / CurrentTime).toFixed(2)])
-        delaySource.push([String(i), DeviceList[i].Delay.toFixed(2)])
+        Clients.push(i.toString())
+        rateData.push((DeviceList[i].PlayTime / CurrentTime).toFixed(2))
+        delayData.push(DeviceList[i].Delay.toFixed(2))
         rateAverage += (DeviceList[i].PlayTime / CurrentTime)
         delayAverage += DeviceList[i].Delay
       }
@@ -292,18 +294,19 @@ function print() {
         })
       }
     }
-    rateAverage /= rateSource.length - 1
-    delayAverage /= delaySource.length - 1
-    rateSource.push(['平均', rateAverage.toFixed(2)])
-    delaySource.push(['平均', delayAverage.toFixed(2)])
-    mainWindow.webContents.send('print_full', [data, links, rateSource, delaySource])
+    Clients.push("平均")
+    rateAverage /= rateData.length - 1
+    delayAverage /= delayData.length - 1
+    rateData.push(rateAverage.toFixed(2))
+    delayData.push(delayAverage.toFixed(2))
+    mainWindow.webContents.send('print_full', [data, links, rateData, delayData, Clients])
   }
   //节点或连接未改变时只更新进度
   else {
     let tooltips = []
     let rateAverage = 0
     let delayAverage = 0
-    for (let i = 0; i < DeviceList.length; i++) {
+    for (let i = 1; i < DeviceList.length; i++) {
       if (DeviceList[i] == null)
         continue
       tooltips.push([(DeviceList[i].PlayTime / CurrentTime).toFixed(2), DeviceList[i].Delay.toFixed(2)])
@@ -417,7 +420,7 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
-  mainWindow.webContents.openDevTools()
+  mainWindow.setMenu(null)
   mainWindow.loadFile('./index.html')
 }
 
@@ -425,8 +428,11 @@ app.whenReady().then(() => {
   ipcMain.handle('continue', run)
   //处理节点退出
   ipcMain.handle('clientExit', function (event, clients) {
-    for (let i = 0; i < clients.length; i++)
+    for (let i = 0; i < clients.length; i++) {
+      if (clients[i] == 0)
+        continue
       EventQueue.push(new ExitEvent(CurrentTime, clients[i]))
+    }
   })
   //处理断开连接
   ipcMain.handle('clientDisconnect', function (event, connections) {
