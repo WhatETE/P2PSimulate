@@ -155,7 +155,7 @@ electronAPI.on_print_full((event, value) => {
     myGraph.setOption(option)
     myRate.setOption(rateOption)
     myDelay.setOption(delayOption)
-    electronAPI.continue()
+    electronAPI.run()
 })
 
 electronAPI.on_print_tags((event, tooltips) => {
@@ -184,5 +184,5 @@ electronAPI.on_print_tags((event, tooltips) => {
     }
     exitCommand = []
     disconnectCommand = []
-    electronAPI.continue()
+    electronAPI.run()
 })
