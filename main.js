@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const _ = require('underscore')
-const SortedArraySet = require("collections/sorted-array-set")
+const { SortedArraySet } = require("./SortedArraySet.js")
 const Heap = require("collections/heap")
 const { DistanceMatrix } = require('./DistanceMatrix.js')
 const { KMeanspp } = require('./KMeans++.js')
@@ -52,11 +52,11 @@ class SendEvent extends Event {
   run() {
     if (DeviceList[this.target] == null)
       return
+    DeviceList[this.target].CachedBlocks = DeviceList[this.target].CachedBlocks.union(this.data)
     //保证缓存区大小
-    if (DeviceList[this.target].CachedBlocks.length == CacheSize) {
-      DeviceList[this.target].CachedBlocks.shift()
-    }
-    DeviceList[this.target].CachedBlocks.push(this.data)
+    let start = DeviceList[this.target].CachedBlocks.length - CacheSize
+    if (start > 0)
+      DeviceList[this.target].CachedBlocks.splice(0, start)
   }
 }
 
@@ -135,7 +135,7 @@ class Client {
     if (pos == null)
       this.pos = [Math.random() * RoomSize, Math.random() * RoomSize]
     this.ConnectSpeed = {}
-    this.CachedBlocks = SortedArraySet()
+    this.CachedBlocks = new SortedArraySet()
     this.PlayTime = 0
     this.Progress = 0
     this.LostBlocks = 0
@@ -154,7 +154,7 @@ class Client {
   //计算连接速度，存储于字典
   SpeedCompute() {
     for (let i of ConnectMatrix[this.ID]) {
-      let speed = parseInt(SpeedRate / Distance.get(this.ID, i))
+      let speed = Math.floor(SpeedRate / Distance.get(this.ID, i))
       speed = Math.max(speed, 20)
       speed = Math.min(speed, 100)
       this.ConnectSpeed[i] = speed
@@ -163,13 +163,21 @@ class Client {
   //向已连接的设备请求数据
   Request() {
     for (let i of ConnectMatrix[this.ID]) {
-      let RequestedCount = 0
+      let AppendTime = 1
+      let Pack = []
       DeviceList[i].CachedBlocks.forEach(j => {
         if (this.CachedBlocks.length == 0 || ((!this.CachedBlocks.has(j)) && (j > this.CachedBlocks.min()))) {
-          EventQueue.push(new SendEvent(CurrentTime + 1 + parseInt(RequestedCount / this.ConnectSpeed[i]), this.ID, j))
-          RequestedCount += 1
+          Pack.push(j)
+          if (Pack.length == this.ConnectSpeed[i]) {
+            EventQueue.push(new SendEvent(CurrentTime + AppendTime, this.ID, Pack))
+            Pack = []
+            AppendTime += 1
+          }
         }
       })
+      if (Pack.length != 0) {
+        EventQueue.push(new SendEvent(CurrentTime + AppendTime, this.ID, Pack))
+      }
     }
   }
   //播放视频
@@ -221,14 +229,14 @@ class Client {
   }
   Connect(ID) {
     ConnectMatrix[this.ID].push(ID)
-    let speed = parseInt(SpeedRate / Distance.get(this.ID, ID))
+    let speed = Math.floor(SpeedRate / Distance.get(this.ID, ID))
     speed = Math.max(speed, 20)
     speed = Math.min(speed, 100)
     this.ConnectSpeed[ID] = speed
   }
   clear() {
     this.ConnectSpeed = {}
-    this.CachedBlocks = SortedArraySet()
+    this.CachedBlocks = new SortedArraySet()
     this.PlayTime = 0
     this.Progress = 0
     this.LostBlocks = 0
@@ -243,7 +251,7 @@ class Server extends Client {
   }
   GenerateBlocks() {
     for (let i = CurrentTime * 30; i < (CurrentTime + 1) * 30; i++) {
-      this.CachedBlocks.add(i)
+      this.CachedBlocks.push(i)
     }
     if (this.CachedBlocks.length > CacheSize)
       this.CachedBlocks.splice(0, this.CachedBlocks.length - CacheSize)

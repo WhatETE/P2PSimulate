@@ -42,7 +42,7 @@ class DistanceMatrix {
         this.data[j][i] = null
     }
   }
-  FindClosestT(i) {
+  FindClosestTo(i) {
     let min = Infinity
     let minj = -1
     for (let j = 0; j < this.size; j++) {
