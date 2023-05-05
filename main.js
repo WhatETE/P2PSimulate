@@ -27,7 +27,13 @@ app.whenReady().then(() => {
   //处理断开连接
   ipcMain.handle('clientDisconnect', (event, connections) => p2pNetwork.ClientDisconnect(connections))
   //处理重启
-  ipcMain.handle('restart', (event, args) => p2pNetwork.restart(args))
+  ipcMain.handle('restart', (event, args) => {
+    p2pNetwork.restart(args)
+    if (stop) {
+      stop = false
+      runp2p()
+    }
+  })
   createWindow()
 })
 

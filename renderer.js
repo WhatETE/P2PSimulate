@@ -1,8 +1,22 @@
 var setter = $('.setter').toArray()
-var button = document.getElementById("but")
 var subdiv = document.getElementById("subdiv")
 
-button.onclick = function () {
+document.getElementById("stop").onclick = function () {
+    document.getElementById("stop").disabled = "true"
+    document.getElementById("continue").disabled = ""
+    electronAPI.stop()
+}
+
+document.getElementById("continue").onclick = function () {
+    document.getElementById("continue").disabled = "true"
+    document.getElementById("stop").disabled = ""
+    electronAPI.continue()
+    electronAPI.run()
+}
+
+document.getElementById("restart").onclick = function () {
+    document.getElementById("continue").disabled = "true"
+    document.getElementById("stop").disabled = ""
     let args = []
     for (let i = 0; i < 6; i++) {
         args.push(setter[i].value)
@@ -56,7 +70,18 @@ var option = {
         text: 'Basic Graph'
     },
     animationDurationUpdate: 0,
-    tooltip: {},
+    tooltip: {
+        formatter: (params) => {
+            if (params.dataType === 'node') {
+                //从节点数据中取出坐标
+                return '位置:(' + params.data.x.toFixed(2) + ', ' + params.data.y.toFixed(2) + '),播放比:' + params.data.Rate + ',延迟:' + params.data.Delay
+            }
+            else if (params.dataType === 'edge') {
+                //从边数据中取出两端节点的id
+                return params.data.source + '->' + params.data.target
+            }
+        }
+    },
     series: [
         {
             type: 'graph',
@@ -77,6 +102,11 @@ var option = {
             },
             label:{
                 show: true
+            },
+            emphasis: {
+                itemStyle: {
+                    color: '#FFA500'
+                }
             }
         }
     ]
@@ -88,13 +118,21 @@ var rateOption = {
         axisPointer: {
           type: 'line'
         },
-        formatter: '{c}'
+        formatter: '{b}:{c}'
     },
-    animationDurationUpdate: 0.5,
+    animationDurationUpdate: 0.2,
     legend: {},
     xAxis: { type: 'value' },
     yAxis: { type: 'category', data: Clients },
-    series: [{ type: 'bar', data: rateData}]
+    series: [{
+        type: 'bar',
+        data: rateData,
+        emphasis: {
+            itemStyle: {
+                color: '#FFA500'
+            }
+        }
+    }]
 }
 
 var delayOption = {
@@ -103,13 +141,21 @@ var delayOption = {
         axisPointer: {
           type: 'line'
         },
-        formatter: '{c}'
+        formatter: '{b}:{c}'
     },
-    animationDurationUpdate: 0.5,
+    animationDurationUpdate: 0.2,
     legend: {},
     xAxis: { type: 'value' },
     yAxis: { type: 'category', data: Clients },
-    series: [{ type: 'bar', data: delayData}]
+    series: [{
+        type: 'bar',
+        data: delayData,
+        emphasis: {
+            itemStyle: {
+                color: '#FFA500'
+            }
+        }
+    }]
 }
 
 myGraph.on('dblclick', function (params) {
@@ -161,7 +207,8 @@ electronAPI.on_print_full((event, value) => {
 electronAPI.on_print_tags((event, tooltips) => {
     for (let i = 0; i < tooltips.length; i++) {
         if (i < tooltips.length - 1) {
-            data[i].tooltip.formatter = tooltips[i][0].toString() + ',' + tooltips[i][1].toString()
+            data[i].Rate = tooltips[i][0]
+            data[i].Delay = tooltips[i][1]
             rateData[i] = tooltips[i][0]
             delayData[i] = tooltips[i][1]
         }

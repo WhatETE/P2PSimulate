@@ -277,10 +277,8 @@ class p2p {
                     name: String(i),
                     x: this.DeviceList[i].pos[0],
                     y: this.DeviceList[i].pos[1],
-                    tooltip: {
-                        position: 'top',
-                        formatter: (this.DeviceList[i].PlayTime / this.CurrentTime).toFixed(2).toString() + ',' + this.DeviceList[i].Delay.toFixed(2).toString()
-                    }
+                    Rate: (this.DeviceList[i].PlayTime / this.CurrentTime).toFixed(2),
+                    Delay: this.DeviceList[i].Delay.toFixed(2)
                 })
                 if (i > 0) {
                     Clients.push(i.toString())
