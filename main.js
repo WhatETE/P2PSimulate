@@ -1,11 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
-const _ = require('underscore')
-const { SortedArraySet } = require("./SortedArraySet.js")
-const Heap = require("collections/heap")
-const { DistanceMatrix } = require('./DistanceMatrix.js')
-const { KMeanspp } = require('./KMeans++.js')
-const { AgglomerativeClustering } = require('./Agglomerative.js')
 const { p2p } = require('./p2p.js')
 
 var mainWindow = null
@@ -21,7 +15,6 @@ const createWindow = () => {
     },
   })
   mainWindow.setMenu(null)
-  mainWindow.webContents.openDevTools()
   mainWindow.loadFile('./index.html')
 }
 

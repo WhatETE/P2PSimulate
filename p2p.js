@@ -1,11 +1,9 @@
 const _ = require('underscore')
-const { SortedArraySet } = require("./SortedArraySet.js")
 const Heap = require("collections/heap")
+const { SortedArraySet } = require("./SortedArraySet.js")
 const { DistanceMatrix } = require('./DistanceMatrix.js')
 const { KMeanspp } = require('./KMeans++.js')
 const { AgglomerativeClustering } = require('./Agglomerative.js')
-
-var mainWindow = null
 
 //事件类
 class Event {
