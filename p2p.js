@@ -115,7 +115,6 @@ class Client {
         this.CachedBlocks = new SortedArraySet()
         this.PlayTime = 0
         this.Progress = 0
-        this.LostBlocks = 0
         this.Delay = 0
     }
     //随机连接设备
@@ -164,7 +163,6 @@ class Client {
             return
         //进度落后则已缺失数据块
         if (this.CachedBlocks[0] > this.Progress) {
-            this.LostBlocks += this.CachedBlocks[0] - this.Progress
             this.Progress = this.CachedBlocks[0]
         }
         let Consecutive = true
@@ -237,7 +235,6 @@ class Client {
         this.CachedBlocks = new SortedArraySet()
         this.PlayTime = 0
         this.Progress = 0
-        this.LostBlocks = 0
         this.Delay = 0
         this.clusterID = -1
     }
