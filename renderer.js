@@ -181,12 +181,9 @@ myDelay.on('dblclick', function (params) {
 
 electronAPI.on_print_full((event, value) => {
     data = value[0]
-    data[0].itemStyle = { color: '#FF0000' }
     links = value[1]
     rateData = value[2]
-    rateData[rateData.length - 1] = { value: rateData[rateData.length - 1], itemStyle: { color: '#FF0000' } }
     delayData = value[3]
-    delayData[delayData.length - 1] = { value: delayData[delayData.length - 1], itemStyle: { color: '#FF0000' } }
     Clients = value[4]
     option.series[0].data = data
     option.series[0].links = links

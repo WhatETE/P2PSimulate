@@ -15,6 +15,7 @@ const createWindow = () => {
     },
   })
   mainWindow.setMenu(null)
+  mainWindow.webContents.openDevTools()
   mainWindow.loadFile('./index.html')
 }
 

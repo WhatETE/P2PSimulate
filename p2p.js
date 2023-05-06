@@ -102,11 +102,12 @@ class DisconnectEvent extends Event {
 
 //客户机类
 class Client {
-    constructor(p2p, ID, pos = null) {
+    constructor(p2p, ID, clusterID = -1, pos = null) {
         this.p2p = p2p
         this.ID = ID
         //创建时加入设备列表
         this.p2p.DeviceList[ID] = this
+        this.clusterID = clusterID
         //随机生成位置
         if (pos == null)
             this.pos = [Math.random() * this.p2p.RoomSize, Math.random() * this.p2p.RoomSize]
@@ -188,6 +189,12 @@ class Client {
         this.p2p.Distance.del(this.ID)
         this.p2p.ConnectMatrix[this.ID] = null
         this.p2p.DeviceList[this.ID] = null
+        if (this.clusterID != -1) {
+            this.p2p.Clusters[this.clusterID].delete(this.ID)
+            if (this.p2p.SuperNode[this.clusterID] == this.ID && this.p2p.Clusters[this.clusterID].length > 0) {
+                this.p2p.SuperNodeInitial(this.clusterID)
+            }
+        }
         for (let i = 0; i < this.p2p.ConnectMatrix.length; i++) {
             if (this.p2p.ConnectMatrix[i] == null)
                 continue
@@ -199,8 +206,23 @@ class Client {
     Disconnect(ID) {
         this.p2p.ConnectMatrix[this.ID].delete(ID)
         delete this.ConnectSpeed[ID]
-        if (this.ExitStrategy) {
-            this.Connect(this.p2p.Distance.FindClosestTo(this.ID))
+        if (this.p2p.ExitStrategy) {
+            if (this.clusterID == -1) {
+                let temp = this.p2p.Distance.GetSortedDistance(this.ID)
+                let t = 0
+                for (t = 0; t < temp.length; t++) {
+                    if (!this.p2p.ConnectMatrix[this.ID].has(temp[t][0]))
+                        break
+                }
+                this.Connect(temp[t][0])
+            }
+            else if (this.p2p.SuperNode[this.clusterID] == this.ID) {
+                if (ID == 0)
+                    this.Connect(0)
+            }
+            else {
+                this.Connect(this.p2p.SuperNode[this.clusterID])
+            }
         }
     }
     Connect(ID) {
@@ -217,6 +239,7 @@ class Client {
         this.Progress = 0
         this.LostBlocks = 0
         this.Delay = 0
+        this.clusterID = -1
     }
 }
 
@@ -257,6 +280,7 @@ class p2p {
         this.CurrentTime = 0
         this.JudgeModified = false
         this.Clusters = null
+        this.SuperNode = null
     }
 
     print() {
@@ -281,6 +305,9 @@ class p2p {
                     Delay: this.DeviceList[i].Delay.toFixed(2)
                 })
                 if (i > 0) {
+                    if (this.NetworkType != 0 && this.SuperNode[this.DeviceList[i].clusterID] == i) {
+                        data[data.length - 1].itemStyle = { color: '#FF00FF' }
+                    }
                     Clients.push(i.toString())
                     rateData.push((this.DeviceList[i].PlayTime / this.CurrentTime).toFixed(2))
                     delayData.push(this.DeviceList[i].Delay.toFixed(2))
@@ -299,6 +326,9 @@ class p2p {
             delayAverage /= delayData.length - 1
             rateData.push(rateAverage.toFixed(2))
             delayData.push(delayAverage.toFixed(2))
+            data[0].itemStyle = { color: '#FF0000' }
+            rateData[rateData.length - 1] = { value: rateData[rateData.length - 1], itemStyle: { color: '#FF0000' } }
+            delayData[delayData.length - 1] = { value: delayData[delayData.length - 1], itemStyle: { color: '#FF0000' } }
             return ['print_full', [data, links, rateData, delayData, Clients]]
         }
         //节点或连接未改变时只更新进度
@@ -356,6 +386,7 @@ class p2p {
         }
         //初始化连接
         if (this.NetworkType == 0) {
+            //随机连接
             for (let i = 1; i < this.DeviceList.length; i++) {
                 if (this.DeviceList[i] == null)
                     continue
@@ -363,6 +394,7 @@ class p2p {
             }
         }
         else {
+            //arr记录有效客户端的ID
             let arr = []
             for (let i = 1; i < this.DeviceList.length; i++) {
                 if (this.DeviceList[i] == null)
@@ -375,20 +407,16 @@ class p2p {
             else if (this.NetworkType == 2) {
                 this.Clusters = AgglomerativeClustering(arr, this.Distance, this.ClusterNum)
             }
+            //SuperNode记录每个簇的超级节点
+            this.SuperNode = new Array(this.ClusterNum)
             for (let i = 0; i < this.ClusterNum; i++) {
-                let minDistance = Infinity
-                let minID = -1
+                this.SuperNodeInitial(i)
+                //其他簇内节点连接到超级节点
                 for (let j = 0; j < this.Clusters[i].length; j++) {
-                    let distance = this.Distance.get(0, this.Clusters[i][j])
-                    if (distance < minDistance) {
-                        minDistance = distance
-                        minID = this.Clusters[i][j]
+                    this.DeviceList[this.Clusters[i][j]].clusterID = i
+                    if (this.Clusters[i][j] != this.SuperNode[i]) {
+                        this.DeviceList[this.Clusters[i][j]].Connect(this.SuperNode[i])
                     }
-                }
-                this.DeviceList[minID].Connect(0)
-                for (let j = 0; j < this.Clusters[i].length; j++) {
-                    if (this.Clusters[i][j] != minID)
-                        this.DeviceList[this.Clusters[i][j]].Connect(minID)
                 }
             }
         }
@@ -398,6 +426,21 @@ class p2p {
                 continue
             this.DeviceList[i].SpeedCompute()
         }
+    }
+    SuperNodeInitial(i) {
+        let minDistance = Infinity
+        let minID = -1
+        //找出每个簇距离服务器最近的节点作为超级节点
+        for (let j = 0; j < this.Clusters[i].length; j++) {
+            let distance = this.Distance.get(0, this.Clusters[i][j])
+            if (distance < minDistance) {
+                minDistance = distance
+                minID = this.Clusters[i][j]
+            }
+        }
+        this.SuperNode[i] = minID
+        //超级节点连接到服务器
+        this.DeviceList[minID].Connect(0)
     }
     run() {
         //运行框架
@@ -419,7 +462,7 @@ class p2p {
     }
     ClientDisconnect(connections) {
         for (let i = 0; i < connections.length; i++)
-            EventQueue.push(new DisconnectEvent(this, CurrentTime, connections[i][0], connections[i][1]))
+            this.EventQueue.push(new DisconnectEvent(this, this.CurrentTime, connections[i][0], connections[i][1]))
     }
     restart(args) {
         this.ClientNum = parseInt(args[0])
