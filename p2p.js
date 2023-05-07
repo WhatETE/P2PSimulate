@@ -1,5 +1,5 @@
-const _ = require('underscore')
 const Heap = require("collections/heap")
+const { sample } = require("./sample.js")
 const { SortedArraySet } = require("./SortedArraySet.js")
 const { DistanceMatrix } = require('./DistanceMatrix.js')
 const { KMeanspp } = require('./KMeans++.js')
@@ -100,7 +100,7 @@ class DisconnectEvent extends Event {
     }
 }
 
-//客户机类
+//客户端类
 class Client {
     constructor(p2p, ID, clusterID = -1, pos = null) {
         this.p2p = p2p
@@ -117,7 +117,7 @@ class Client {
         this.Progress = 0
         this.Delay = 0
     }
-    //随机连接设备
+    //随机连接节点
     RandomConnect() {
         let t = new Array()
         for (let i = 0; i < this.p2p.DeviceList.length; i++) {
@@ -125,7 +125,7 @@ class Client {
                 continue
             t.push(i)
         }
-        this.p2p.ConnectMatrix[this.ID] = _.sample(t, this.p2p.ConnectNum)
+        this.p2p.ConnectMatrix[this.ID] = sample(t, this.p2p.ConnectNum)
     }
     //计算连接速度，存储于字典
     SpeedCompute() {
@@ -254,6 +254,7 @@ class Server extends Client {
     }
 }
 
+//p2p网络类
 class p2p {
     constructor() {
         this.ClientNum = 100
@@ -279,7 +280,7 @@ class p2p {
         this.Clusters = null
         this.SuperNode = null
     }
-
+    //输出当前网络状态
     print() {
         //节点或连接改变时全局更新
         if (this.CurrentTime == 0 || this.JudgeModified) {
@@ -346,7 +347,7 @@ class p2p {
             return ['print_tags', tooltips]
         }
     }
-
+    //初始化网络
     initial() {
         //全局时间
         this.CurrentTime = 0
@@ -389,6 +390,12 @@ class p2p {
                     continue
                 this.DeviceList[i].RandomConnect()
             }
+            //计算连接速度
+            for (let i = 1; i < this.DeviceList.length; i++) {
+                if (this.DeviceList[i] == null)
+                    continue
+                this.DeviceList[i].SpeedCompute()
+            }
         }
         else {
             //arr记录有效客户端的ID
@@ -417,13 +424,8 @@ class p2p {
                 }
             }
         }
-        //计算连接速度
-        for (let i = 1; i < this.DeviceList.length; i++) {
-            if (this.DeviceList[i] == null)
-                continue
-            this.DeviceList[i].SpeedCompute()
-        }
     }
+    //初始化簇的超级节点
     SuperNodeInitial(i) {
         let minDistance = Infinity
         let minID = -1
@@ -439,8 +441,8 @@ class p2p {
         //超级节点连接到服务器
         this.DeviceList[minID].Connect(0)
     }
+    //运行框架
     run() {
-        //运行框架
         new GenerateEvent(this, this.CurrentTime).run()
         while (this.EventQueue.length > 0 && this.EventQueue.peek().time <= this.CurrentTime)
             this.EventQueue.pop().run()
@@ -450,6 +452,7 @@ class p2p {
         this.CurrentTime += 1
         return print
     }
+    //客户端退出
     ClientExit(clients) {
         for (let i = 0; i < clients.length; i++) {
             if (clients[i] == 0)

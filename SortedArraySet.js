@@ -1,6 +1,6 @@
 class SortedArraySet {
     constructor(data = []) {
-        this.data = data
+        this.data = new Set(data).toArray()
         this.data.sort()
     }
     get length() {

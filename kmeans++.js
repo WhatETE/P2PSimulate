@@ -9,18 +9,19 @@ function getCentroids(data, distanceMatrix, k) {
     while (centroids.length < k) {
         let distances = []
         let sum = 0
-        //计算每一个点到已有中心点的距离保存于distances中
         data.forEach((element) => {
             let distancesToCentroids = []
             centroids.forEach((centroid) => {
                 distancesToCentroids.push(distanceMatrix.get(element, centroid))
             })
+            //每个点到已有中心点的最短距离
             let minDistance = Math.min(...distancesToCentroids)
             distances.push(minDistance)
+            //最短距离的累计
             sum += minDistance
         })
-        //计算权重=点到已有中心点的距离/所有点到已有中心点的距离之和
-        let weights = distances.map((distance) => distance / sum)
+        //计算权重=最短距离的平方/累计距离
+        let weights = distances.map((distance) => Math.pow(distance, 2) / sum)
         //根据权重随机选择下一个中心点
         let index = weightedRandom(weights)
         centroids.push(data[index])

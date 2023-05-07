@@ -6,7 +6,8 @@ var mainWindow = null
 var p2pNetwork = new p2p()
 var stop = false
 
-const createWindow = () => {
+//创建主窗口
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -17,6 +18,14 @@ const createWindow = () => {
   mainWindow.setMenu(null)
   mainWindow.webContents.openDevTools()
   mainWindow.loadFile('./index.html')
+}
+
+function runp2p() {
+  if (stop)
+    return
+  //将P2P网络当前运行数据发送给渲染进程
+  let tempargs = p2pNetwork.run()
+  mainWindow.webContents.send(tempargs[0], tempargs[1])
 }
 
 app.whenReady().then(() => {
@@ -36,13 +45,6 @@ app.whenReady().then(() => {
     }
   })
   createWindow()
+  p2pNetwork.initial()
+  setTimeout(runp2p, 1000)
 })
-
-function runp2p() {
-  if (stop)
-    return
-  let tempargs = p2pNetwork.run()
-  mainWindow.webContents.send(tempargs[0], tempargs[1])
-}
-p2pNetwork.initial()
-setTimeout(runp2p, 1000)

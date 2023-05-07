@@ -2,12 +2,14 @@ var setter = $('.setter').toArray()
 var subdiv = document.getElementById("subdiv")
 
 document.getElementById("stop").onclick = function () {
+    //按钮互斥
     document.getElementById("stop").disabled = "true"
     document.getElementById("continue").disabled = ""
     electronAPI.stop()
 }
 
 document.getElementById("continue").onclick = function () {
+    //按钮互斥
     document.getElementById("continue").disabled = "true"
     document.getElementById("stop").disabled = ""
     electronAPI.continue()
@@ -17,6 +19,7 @@ document.getElementById("continue").onclick = function () {
 document.getElementById("restart").onclick = function () {
     document.getElementById("continue").disabled = "true"
     document.getElementById("stop").disabled = ""
+    //获取参数
     let args = []
     for (let i = 0; i < 6; i++) {
         args.push(setter[i].value)
@@ -29,11 +32,17 @@ document.getElementById("restart").onclick = function () {
     electronAPI.restart(args)
 }
 
+//限制输入
 for (let i = 0; i < 5; i++) {
     setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
 }
+for (let i = 9; i < 11; i++) {
+    setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
+}
+
 setter[5].oninput = () => { setter[5].value = setter[5].value.replace(/[^\0-9\.]/g, '') }
 setter[8].onchange = () => {
+    //根据选择的模式显示不同的设置
     if (setter[8].selectedIndex == 1) {
         subdiv.style.display = "block"
         subdiv.children[1].style.display = "block"
@@ -45,9 +54,6 @@ setter[8].onchange = () => {
     else {
         subdiv.style.display = "none"
     }
-}
-for (let i = 9; i < 11; i++) {
-    setter[i].oninput = () => {setter[i].value = setter[i].value.replace(/[^0-9]/g,'')}
 }
 
 var graphDom = document.getElementById('graph')
@@ -158,6 +164,7 @@ var delayOption = {
     }]
 }
 
+//双击事件
 myGraph.on('dblclick', function (params) {
     if (params.dataType === 'node') {
         exitCommand.push(parseInt(params.data.name))
@@ -169,13 +176,15 @@ myGraph.on('dblclick', function (params) {
 
 myRate.on('dblclick', function (params) {
     if (params.componentType === 'series' && params.componentSubType === 'bar') {
-        exitCommand.push(parseInt(params.data[0]))
+        if (params.name == '平均')
+            return
+        exitCommand.push(parseInt(params.name))
     }
 })
 
 myDelay.on('dblclick', function (params) {
     if (params.componentType === 'series' && params.componentSubType === 'bar') {
-        exitCommand.push(parseInt(params.data[0]))
+        exitCommand.push(parseInt(params.name))
     }
 })
 
@@ -191,6 +200,7 @@ electronAPI.on_print_full((event, value) => {
     rateOption.yAxis.data = Clients
     delayOption.series[0].data = delayData
     delayOption.yAxis.data = Clients
+    //根据节点数量调整图表高度
     rateDom.style.height = (1000 * data.length / 100).toString() + 'px'
     delayDom.style.height = (1000 * data.length / 100).toString() + 'px'
     myRate.resize()
